@@ -1,6 +1,6 @@
 #!/bin/bash  
 # DizerUPS Uninstallation Script for Raspberry Pi  
-# Version: 1.1  
+# Version: 1.0  
   
 set -e  
   
