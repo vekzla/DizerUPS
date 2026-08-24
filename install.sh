@@ -163,8 +163,7 @@ chmod 600 "$APP_DIR/config.yaml"
 # -------------------------------------------------  
 echo ""  
 echo "Step 9: Creating systemd service..."  
-printf '[Unit]\nDescription=DizerUPS Web Monitor\nAfter=network-online.target nut-server.service\nWants=network-online.target\n\n[Service]\nType=simple\nUser=%s\nGroup=%s\nWorkingDirectory=%s\nExecStart=%s/venv/bin/python3 %s/ups_monitor.py\nRestart=on-failure\nRestartSec=5\n\n[Install]\nWantedBy=multi-user.target\n' \  
-    "$ACTUAL_USER" "$ACTUAL_GROUP" "$APP_DIR" "$APP_DIR" "$APP_DIR" > /etc/systemd/system/ups-monitor.service  
+printf '[Unit]\nDescription=DizerUPS Web Monitor\nAfter=network-online.target nut-server.service\nWants=network-online.target\n\n[Service]\nType=simple\nUser=%s\nGroup=%s\nWorkingDirectory=%s\nExecStart=%s/venv/bin/python3 %s/ups_monitor.py\nRestart=on-failure\nRestartSec=5\n\n[Install]\nWantedBy=multi-user.target\n' "$ACTUAL_USER" "$ACTUAL_GROUP" "$APP_DIR" "$APP_DIR" "$APP_DIR" > /etc/systemd/system/ups-monitor.service  
   
 # -------------------------------------------------  
 # Step 10: Enable and start everything  
