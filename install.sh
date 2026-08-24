@@ -1,10 +1,10 @@
 #!/bin/bash  
 # DizerUPS Automated Installation Script for Raspberry Pi  
-# Version: 1.2  
+# Version: 1.0 
   
 set -e  
   
-DIZERUPS_VERSION="1.2"  
+DIZERUPS_VERSION="1.0"  
   
 echo "=========================================="  
 echo "DizerUPS Automated Installation (v$DIZERUPS_VERSION)"  
