@@ -1,10 +1,10 @@
 #!/bin/bash  
 # DizerUPS Automated Installation Script for Raspberry Pi  
-# Version: 1.3  
+# Version: 1.4
   
 set -e  
   
-DIZERUPS_VERSION="1.3"  
+DIZERUPS_VERSION="1.4"  
   
 echo "=========================================="  
 echo "DizerUPS Automated Installation (v$DIZERUPS_VERSION)"  
@@ -70,14 +70,13 @@ SCAN_OUTPUT="$(nut-scanner -U 2>/dev/null || true)"
 echo "$SCAN_OUTPUT"  
   
 # ------------------------------------------------------------------  
-# Step 4: Parse scan results (THE FIX)  
+# Step 4: Parse scan results  
 # Extract the text between the double quotes for each field.  
-# The trailing space in each pattern avoids matching productid/  
-# vendorid/busport. Never execute the values as commands.  
+# Never execute the values as commands.  
 # ------------------------------------------------------------------  
-UPS_DRIVER="$(printf  '%s\n' "$SCAN_OUTPUT" | awk -F'"' '/driver /  {print $2; exit}')"  
-UPS_PORT="$(printf    '%s\n' "$SCAN_OUTPUT" | awk -F'"' '/[[:space:]]port /  {print $2; exit}')"  
-UPS_VENDOR="$(printf  '%s\n' "$SCAN_OUTPUT" | awk -F'"' '/vendor /  {print $2; exit}')"  
+UPS_DRIVER="$(printf '%s\n' "$SCAN_OUTPUT" | awk -F'"' '/driver /  {print $2; exit}')"  
+UPS_PORT="$(printf '%s\n' "$SCAN_OUTPUT" | awk -F'"' '/[[:space:]]port /  {print $2; exit}')"  
+UPS_VENDOR="$(printf '%s\n' "$SCAN_OUTPUT" | awk -F'"' '/vendor /  {print $2; exit}')"  
 UPS_PRODUCT="$(printf '%s\n' "$SCAN_OUTPUT" | awk -F'"' '/product / {print $2; exit}')"  
   
 # Fallbacks for the CyberPower VP1200ELCD if the scan returns nothing  
@@ -94,23 +93,20 @@ echo "  Vendor:  $UPS_VENDOR"
 echo "  Product: $UPS_PRODUCT"  
   
 # ------------------------------------------------------------------  
-# Step 5: Write NUT config (printf-based, no here-docs)  
+# Step 5: Write NUT config (printf-based, no here-docs, no line-continuations)  
 # ------------------------------------------------------------------  
 echo ""  
 echo "Step 5: Configuring NUT..."  
   
 printf 'MODE=netserver\n' > /etc/nut/nut.conf  
   
-printf '[myups]\n    driver = %s\n    port = %s\n    desc = "%s %s"\n' \  
-    "$UPS_DRIVER" "$UPS_PORT" "$UPS_VENDOR" "$UPS_PRODUCT" > /etc/nut/ups.conf  
+printf '[myups]\n    driver = %s\n    port = %s\n    desc = "%s %s"\n' "$UPS_DRIVER" "$UPS_PORT" "$UPS_VENDOR" "$UPS_PRODUCT" > /etc/nut/ups.conf  
   
 printf 'LISTEN 0.0.0.0 3493\nMAXAGE 30\n' > /etc/nut/upsd.conf  
   
-printf '[upsmon]\n    password = %s\n    upsmon master\n' \  
-    "$NUT_PASSWORD" > /etc/nut/upsd.users  
+printf '[upsmon]\n    password = %s\n    upsmon master\n' "$NUT_PASSWORD" > /etc/nut/upsd.users  
   
-printf 'MODE = netserver\nMONITOR myups@localhost 1 upsmon %s master\nPOWERDOWNFLAG /etc/killpower\nSHUTDOWNCMD "/sbin/shutdown -h now"\n' \  
-    "$NUT_PASSWORD" > /etc/nut/upsmon.conf  
+printf 'MODE = netserver\nMONITOR myups@localhost 1 upsmon %s master\nPOWERDOWNFLAG /etc/killpower\nSHUTDOWNCMD "/sbin/shutdown -h now"\n' "$NUT_PASSWORD" > /etc/nut/upsmon.conf  
   
 chown root:nut /etc/nut/*.conf /etc/nut/upsd.users  
 chmod 640 /etc/nut/*.conf /etc/nut/upsd.users  
@@ -139,8 +135,8 @@ echo ""
 echo "Step 7: Installing application..."  
 mkdir -p "$APP_DIR/templates"  
 cp "$SCRIPT_DIR/ups_monitor.py"        "$APP_DIR/"  
-cp "$SCRIPT_DIR/config.yaml"          "$APP_DIR/"  
-cp "$SCRIPT_DIR/requirements.txt"     "$APP_DIR/"  
+cp "$SCRIPT_DIR/config.yaml"           "$APP_DIR/"  
+cp "$SCRIPT_DIR/requirements.txt"      "$APP_DIR/"  
 cp "$SCRIPT_DIR/templates/dashboard.html" "$APP_DIR/templates/"  
   
 # ------------------------------------------------------------------  
@@ -150,9 +146,9 @@ cp "$SCRIPT_DIR/templates/dashboard.html" "$APP_DIR/templates/"
 echo ""  
 echo "Step 8: Writing credentials into config.yaml..."  
 sed -i "s|password: your_nut_password|password: $NUT_PASSWORD|g" "$APP_DIR/config.yaml"  
-sed -i "s|username: your_web_username|username: $WEB_USERNAME|g"  "$APP_DIR/config.yaml"  
-sed -i "s|username: admin|username: $WEB_USERNAME|g"             "$APP_DIR/config.yaml"  
-sed -i "s|password: your_web_password|password: $WEB_PASSWORD|g"  "$APP_DIR/config.yaml"  
+sed -i "s|username: your_web_username|username: $WEB_USERNAME|g" "$APP_DIR/config.yaml"  
+sed -i "s|username: admin|username: $WEB_USERNAME|g" "$APP_DIR/config.yaml"  
+sed -i "s|password: your_web_password|password: $WEB_PASSWORD|g" "$APP_DIR/config.yaml"  
   
 # ------------------------------------------------------------------  
 # Step 9: Python virtual environment  
@@ -177,13 +173,11 @@ chown -R "$ACTUAL_USER:$ACTUAL_GROUP" "$LOG_DIR"
 chown -R "$ACTUAL_USER:$ACTUAL_GROUP" "$APP_DIR"  
   
 # ------------------------------------------------------------------  
-# Step 12: systemd service (printf-based)  
+# Step 12: systemd service (printf-based, single line)  
 # ------------------------------------------------------------------  
 echo ""  
 echo "Step 12: Creating systemd service..."  
-printf '[Unit]\nDescription=DizerUPS UPS Monitor\nAfter=network.target nut-server.service\n\n[Service]\nType=simple\nUser=%s\nGroup=%s\nWorkingDirectory=%s\nExecStart=%s/venv/bin/python3 %s/ups_monitor.py\nRestart=always\nRestartSec=5\n\n[Install]\nWantedBy=multi-user.target\n' \  
-    "$ACTUAL_USER" "$ACTUAL_GROUP" "$APP_DIR" "$APP_DIR" "$APP_DIR" \  
-    > /etc/systemd/system/ups-monitor.service  
+printf '[Unit]\nDescription=DizerUPS UPS Monitor\nAfter=network.target nut-server.service\n\n[Service]\nType=simple\nUser=%s\nGroup=%s\nWorkingDirectory=%s\nExecStart=%s/venv/bin/python3 %s/ups_monitor.py\nRestart=always\nRestartSec=5\n\n[Install]\nWantedBy=multi-user.target\n' "$ACTUAL_USER" "$ACTUAL_GROUP" "$APP_DIR" "$APP_DIR" "$APP_DIR" > /etc/systemd/system/ups-monitor.service  
   
 systemctl daemon-reload  
 systemctl enable ups-monitor  
