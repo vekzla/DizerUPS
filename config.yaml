@@ -1,11 +1,13 @@
+# DizerUPS Configuration File  
+  
 # UPS Configuration  
 ups:  
-  type: nut  # Options: nut, usb_hid  
+  type: nut  
   nut:  
     host: localhost  
     port: 3493  
     username: upsmon  
-    password: your_nut_password  
+    password: CHANGE_ME_NUT  
     ups_name: myups  
   
 # Web Interface Configuration  
@@ -13,7 +15,7 @@ web:
   host: 0.0.0.0  
   port: 5000  
   username: admin  
-  password: your_web_password  
+  password: CHANGE_ME_WEB  
   
 # Logging Configuration  
 logging:  
@@ -24,15 +26,20 @@ logging:
   
 # Alert Configuration  
 alerts:  
-  low_battery_threshold: 20  # Percentage  
-  high_load_threshold: 80     # Percentage  
+  low_battery_threshold: 20  
+  high_load_threshold: 80  
   email_alerts: false  
   email_to: your_email@example.com  
+  email_from: ups@example.com  
+  smtp_server: smtp.example.com  
+  smtp_port: 587  
+  smtp_username: your_smtp_username  
+  smtp_password: your_smtp_password  
   
 # Shutdown Configuration  
 shutdown:  
-  enabled: false             # Must be true for /api/shutdown to work  
-  low_battery_threshold: 10  # Percentage  
+  enabled: false  
+  low_battery_threshold: 10  
   delay_seconds: 60  
   
 # Logging Interval (seconds)  
