@@ -148,17 +148,7 @@ Features:
 - `GET /api/status` - Current UPS status (includes `input_frequency`, calculated currents)  
 - `GET /api/history?hours=24` - Historical data  
 - `GET /api/events?limit=50` - Recent events  
-- `POST /api/shutdown` - Trigger emergency shutdown (auth + `shutdown.enabled` required)  
-  
-## Enabling the Shutdown Button  
-  
-1. Set `shutdown.enabled: true` in `config.yaml`.  
-2. Grant the service user passwordless sudo for shutdown via `sudo visudo -f /etc/sudoers.d/dizerups-shutdown`:  
-   ```  
-   'user' ALL=(root) NOPASSWD: /sbin/shutdown  
-   ```  
-   Replace `user` with your service/account user.  
-  
+
 ## Managing the Service  
   
 ```bash  
