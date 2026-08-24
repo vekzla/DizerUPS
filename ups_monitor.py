@@ -2,10 +2,10 @@
 """  
 DizerUPS - Raspberry Pi UPS Monitor  
 Automated UPS monitoring with web dashboard  
-Version: 1.1  
+Version: 1.0  
 """  
   
-__version__ = "1.1"  
+__version__ = "1.0"  
   
 import os  
 import sys  
