@@ -1,0 +1,39 @@
+# UPS Configuration  
+ups:  
+  type: nut  # Options: nut, usb_hid  
+  nut:  
+    host: localhost  
+    port: 3493  
+    username: upsmon  
+    password: your_nut_password  
+    ups_name: myups  
+  
+# Web Interface Configuration  
+web:  
+  host: 0.0.0.0  
+  port: 5000  
+  username: admin  
+  password: your_web_password  
+  
+# Logging Configuration  
+logging:  
+  file: /var/log/ups-monitor/ups-monitor.log  
+  level: INFO  
+  max_size_mb: 10  
+  backup_count: 5  
+  
+# Alert Configuration  
+alerts:  
+  low_battery_threshold: 20  # Percentage  
+  high_load_threshold: 80     # Percentage  
+  email_alerts: false  
+  email_to: your_email@example.com  
+  
+# Shutdown Configuration  
+shutdown:  
+  enabled: false             # Must be true for /api/shutdown to work  
+  low_battery_threshold: 10  # Percentage  
+  delay_seconds: 60  
+  
+# Logging Interval (seconds)  
+logging_interval: 60

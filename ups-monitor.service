@@ -1,0 +1,17 @@
+[Unit]
+Description=UPS Monitor Service
+After=network.target nut-server.service upsd.service
+
+[Service]
+Type=simple
+User=pi
+Group=pi
+WorkingDirectory=/home/pi/ups-monitor
+ExecStart=/usr/bin/python3 /home/pi/ups-monitor/ups_monitor.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

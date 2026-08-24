@@ -1,0 +1,519 @@
+<!DOCTYPE html>  
+<html lang="en">  
+<head>  
+    <meta charset="UTF-8">  
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">  
+    <title>DizerUPS - Raspberry Pi UPS Monitor</title>  
+    <style>  
+        * {  
+            margin: 0;  
+            padding: 0;  
+            box-sizing: border-box;  
+        }  
+  
+        body {  
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;  
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);  
+            min-height: 100vh;  
+            padding: 20px;  
+        }  
+  
+        .container {  
+            max-width: 1200px;  
+            margin: 0 auto;  
+        }  
+  
+        .header {  
+            text-align: center;  
+            color: white;  
+            margin-bottom: 30px;  
+        }  
+  
+        .header h1 {  
+            font-size: 2.5em;  
+            margin-bottom: 10px;  
+        }  
+  
+        .header p {  
+            opacity: 0.9;  
+        }  
+  
+        .controls {  
+            display: flex;  
+            justify-content: center;  
+            gap: 15px;  
+            margin-bottom: 25px;  
+        }  
+  
+        .btn {  
+            border: none;  
+            padding: 12px 24px;  
+            border-radius: 8px;  
+            font-size: 1em;  
+            font-weight: 600;  
+            cursor: pointer;  
+            transition: transform 0.1s, opacity 0.2s;  
+        }  
+  
+        .btn:active { transform: scale(0.97); }  
+  
+        .btn-refresh {  
+            background: #ffffff;  
+            color: #4a4a4a;  
+        }  
+  
+        .btn-shutdown {  
+            background: #e74c3c;  
+            color: #ffffff;  
+        }  
+  
+        .btn-shutdown:hover { opacity: 0.9; }  
+  
+        .grid {  
+            display: grid;  
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));  
+            gap: 20px;  
+            margin-bottom: 30px;  
+        }  
+  
+        .card {  
+            background: white;  
+            border-radius: 12px;  
+            padding: 25px;  
+            box-shadow: 0 8px 20px rgba(0,0,0,0.15);  
+        }  
+  
+        .card h2 {  
+            font-size: 1.2em;  
+            margin-bottom: 20px;  
+            color: #333;  
+            border-bottom: 2px solid #eee;  
+            padding-bottom: 10px;  
+        }  
+  
+        .metric {  
+            display: flex;  
+            justify-content: space-between;  
+            align-items: center;  
+            margin-bottom: 15px;  
+        }  
+  
+        .metric-label {  
+            color: #666;  
+            font-size: 0.95em;  
+        }  
+  
+        .metric-value {  
+            font-weight: 700;  
+            color: #333;  
+            font-size: 1.1em;  
+        }  
+  
+        .bar-container {  
+            width: 100%;  
+            height: 10px;  
+            background: #eee;  
+            border-radius: 5px;  
+            overflow: hidden;  
+            margin-top: 5px;  
+        }  
+  
+        .bar-fill {  
+            height: 100%;  
+            background: #2ecc71;  
+            transition: width 0.4s ease;  
+        }  
+  
+        .bar-fill.warning { background: #f39c12; }  
+        .bar-fill.danger { background: #e74c3c; }  
+  
+        .status-badge {  
+            display: inline-block;  
+            padding: 6px 14px;  
+            border-radius: 20px;  
+            font-weight: 700;  
+            font-size: 0.9em;  
+            cursor: help;  
+        }  
+  
+        .status-online { background: #d4f8e0; color: #1e7e4b; }  
+        .status-battery { background: #fff3cd; color: #856404; }  
+        .status-unknown { background: #f0f0f0; color: #666; }  
+  
+        .faults-panel {  
+            background: white;  
+            border-radius: 12px;  
+            padding: 25px;  
+            box-shadow: 0 8px 20px rgba(0,0,0,0.15);  
+            margin-bottom: 30px;  
+        }  
+  
+        .faults-panel.no-faults .fault-item { display: none; }  
+  
+        .fault-item {  
+            padding: 10px;  
+            background: #fdecea;  
+            color: #c0392b;  
+            border-radius: 6px;  
+            margin-bottom: 8px;  
+        }  
+  
+        .events-list .event {  
+            padding: 12px;  
+            border-radius: 6px;  
+            margin-bottom: 10px;  
+            background: #f8f9fa;  
+        }  
+  
+        .event.warning { border-left: 4px solid #f39c12; }  
+        .event.critical { border-left: 4px solid #e74c3c; }  
+        .event.info { border-left: 4px solid #3498db; }  
+  
+        .event-time {  
+            font-size: 0.8em;  
+            color: #999;  
+        }  
+  
+        .event-message {  
+            color: #333;  
+            margin-top: 4px;  
+        }  
+  
+        .legend-grid {  
+            display: grid;  
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));  
+            gap: 12px;  
+        }  
+  
+        .legend-item {  
+            display: flex;  
+            gap: 8px;  
+        }  
+  
+        .legend-code {  
+            font-weight: 700;  
+            color: #4a4a4a;  
+            min-width: 45px;  
+        }  
+  
+        .legend-desc {  
+            color: #666;  
+            font-size: 0.9em;  
+        }  
+  
+        .calc-block {  
+            background: #f8f9fa;  
+            border-radius: 8px;  
+            padding: 15px;  
+            margin-bottom: 12px;  
+        }  
+  
+        .calc-block code {  
+            display: block;  
+            font-family: 'Courier New', monospace;  
+            color: #2c3e50;  
+            margin-top: 6px;  
+        }  
+    </style>  
+</head>  
+<body>  
+    <div class="container">  
+        <div class="header">  
+            <h1>DizerUPS</h1>  
+            <p>Raspberry Pi UPS Monitor</p>  
+        </div>  
+  
+        <div class="controls">  
+            <button class="btn btn-refresh" onclick="refreshData()">Refresh</button>  
+            <button class="btn btn-shutdown" onclick="requestShutdown()">Shutdown</button>  
+        </div>  
+  
+        <div class="grid">  
+            <!-- Status -->  
+            <div class="card">  
+                <h2>Status</h2>  
+                <div class="metric">  
+                    <span class="metric-label">UPS Status</span>  
+                    <span class="status-badge status-unknown" id="ups-status"  
+                          title="OL = On Line (mains power). OB = On Battery. LB = Low Battery. CHRG = Charging. DISCHRG = Discharging. FSD = Forced Shutdown. RB = Replace Battery. OVER = Overload. OFF = Output Off.">--</span>  
+                </div>  
+                <div class="metric">  
+                    <span class="metric-label">Charging</span>  
+                    <span class="status-badge status-unknown" id="battery-charging"  
+                          title="Charging = battery replenishing. Discharging = running on battery. Idle = full/float charge on mains.">--</span>  
+                </div>  
+            </div>  
+  
+            <!-- Battery -->  
+            <div class="card">  
+                <h2>Battery</h2>  
+                <div class="metric">  
+                    <span class="metric-label">Charge</span>  
+                    <span class="metric-value" id="battery-charge">--</span>  
+                </div>  
+                <div class="bar-container">  
+                    <div class="bar-fill" id="battery-charge-bar" style="width: 0%"></div>  
+                </div>  
+                <div class="metric" style="margin-top:15px;">  
+                    <span class="metric-label">Voltage</span>  
+                    <span class="metric-value" id="battery-voltage">--</span>  
+                </div>  
+                <div class="metric">  
+                    <span class="metric-label">Runtime</span>  
+                    <span class="metric-value" id="battery-runtime">--</span>  
+                </div>  
+                <div class="metric">  
+                    <span class="metric-label">Current</span>  
+                    <span class="metric-value" id="battery-current">--</span>  
+                </div>  
+                <div class="bar-container">  
+                    <div class="bar-fill" id="battery-current-bar" style="width: 0%"></div>  
+                </div>  
+            </div>  
+  
+            <!-- Input Power -->  
+            <div class="card">  
+                <h2>Input Power</h2>  
+                <div class="metric">  
+                    <span class="metric-label">Voltage</span>  
+                    <span class="metric-value" id="input-voltage">--</span>  
+                </div>  
+                <div class="metric">  
+                    <span class="metric-label">Frequency</span>  
+                    <span class="metric-value" id="input-frequency">--</span>  
+                </div>  
+                <div class="metric">  
+                    <span class="metric-label">Current</span>  
+                    <span class="metric-value" id="input-current">--</span>  
+                </div>  
+                <div class="bar-container">  
+                    <div class="bar-fill" id="input-current-bar" style="width: 0%"></div>  
+                </div>  
+            </div>  
+  
+            <!-- Output / Load -->  
+            <div class="card">  
+                <h2>Output / Load</h2>  
+                <div class="metric">  
+                    <span class="metric-label">Voltage</span>  
+                    <span class="metric-value" id="load-voltage">--</span>  
+                </div>  
+                <div class="metric">  
+                    <span class="metric-label">Load</span>  
+                    <span class="metric-value" id="ups-load">--</span>  
+                </div>  
+                <div class="bar-container">  
+                    <div class="bar-fill" id="ups-load-bar" style="width: 0%"></div>  
+                </div>  
+                <div class="metric" style="margin-top:15px;">  
+                    <span class="metric-label">Load Current</span>  
+                    <span class="metric-value" id="load-current">--</span>  
+                </div>  
+                <div class="bar-container">  
+                    <div class="bar-fill" id="load-current-bar" style="width: 0%"></div>  
+                </div>  
+            </div>  
+        </div>  
+  
+        <!-- Faults -->  
+        <div class="faults-panel no-faults" id="faults-panel">  
+            <h2>Active Faults</h2>  
+            <div id="faults-list"></div>  
+        </div>  
+  
+        <!-- Legend -->  
+        <div class="card" style="margin-bottom:30px;">  
+            <h2>Legend — UPS Status Codes</h2>  
+            <div class="legend-grid">  
+                <div class="legend-item"><span class="legend-code">OL</span><span class="legend-desc">On Line — running from mains power (normal).</span></div>  
+                <div class="legend-item"><span class="legend-code">OB</span><span class="legend-desc">On Battery — mains lost, running from battery.</span></div>  
+                <div class="legend-item"><span class="legend-code">LB</span><span class="legend-desc">Low Battery — charge critically low.</span></div>  
+                <div class="legend-item"><span class="legend-code">CHRG</span><span class="legend-desc">Charging — battery is replenishing.</span></div>  
+                <div class="legend-item"><span class="legend-code">DISCHRG</span><span class="legend-desc">Discharging — battery is supplying the load.</span></div>  
+                <div class="legend-item"><span class="legend-code">RB</span><span class="legend-desc">Replace Battery — battery failed self-test.</span></div>  
+                <div class="legend-item"><span class="legend-code">OVER</span><span class="legend-desc">Overload — load exceeds UPS capacity.</span></div>  
+                <div class="legend-item"><span class="legend-code">FSD</span><span class="legend-desc">Forced Shutdown — shutdown in progress.</span></div>  
+                <div class="legend-item"><span class="legend-code">OFF</span><span class="legend-desc">Output Off — UPS output is disabled.</span></div>  
+            </div>  
+        </div>  
+  
+        <!-- Calculations -->  
+        <div class="card" style="margin-bottom:30px;">  
+            <h2>How the Values Are Calculated</h2>  
+            <div class="calc-block">  
+                <strong>Real power (Watts)</strong> — your UPS reports load as a percentage, so power is derived from nominal power based on model being 720W:  
+                <code>power = (ups.load / 100) × ups.realpower.nominal</code>  
+                <code>example: (15 / 100) × 720 = 108 W</code>  
+            </div>  
+            <div class="calc-block">  
+                <strong>Input / Load current (Amps)</strong> — derived from power and the measured voltage (P = V × I):  
+                <code>current = power / voltage</code>  
+                <code>example: 108 / 246 ≈ 0.44 A</code>  
+            </div>  
+            <div class="calc-block">  
+                <strong>Battery current (Amps)</strong> — only while discharging (status DISCHRG/OB); 0 A while On Line:  
+                <code>battery_current = power / battery.voltage   (when discharging)</code>  
+                <code>example on battery: 108 / 28.2 ≈ 3.83 A</code>  
+            </div>  
+            <div class="calc-block">  
+                <strong>Frequency (Hz)</strong> — some CyberPower units report deci-Hertz; values &gt; 100 are divided by 10:  
+                <code>example: 498.0 → 49.8 Hz</code>  
+            </div>  
+        </div>  
+  
+        <!-- Events -->  
+        <div class="card">  
+            <h2>Recent Events</h2>  
+            <div class="events-list" id="events-list"></div>  
+        </div>  
+    </div>  
+  
+    <script>  
+        function formatTime(date) {  
+            return date.toLocaleString();  
+        }  
+  
+        function updateBar(id, value) {  
+            const bar = document.getElementById(id);  
+            if (!bar) return;  
+            const v = Math.max(0, Math.min(100, value || 0));  
+            bar.style.width = v + '%';  
+            bar.classList.remove('warning', 'danger');  
+            if (v > 90) {  
+                bar.classList.add('danger');  
+            } else if (v > 80) {  
+                bar.classList.add('warning');  
+            }  
+        }  
+  
+        function updateStatusBadge(id, text, kind) {  
+            const el = document.getElementById(id);  
+            if (!el) return;  
+            el.textContent = text || '--';  
+            el.classList.remove('status-online', 'status-battery', 'status-unknown');  
+            el.classList.add(kind);  
+        }  
+  
+        async function fetchStatus() {  
+            try {  
+                const response = await fetch('/api/status');  
+                const data = await response.json();  
+  
+                // Status badges  
+                const status = data.status || 'Unknown';  
+                let kind = 'status-unknown';  
+                if (status.includes('OL')) kind = 'status-online';  
+                else if (status.includes('OB') || status.includes('DISCHRG')) kind = 'status-battery';  
+                updateStatusBadge('ups-status', status, kind);  
+  
+                const charging = data.battery_charging || 'Unknown';  
+                let ckind = 'status-unknown';  
+                if (charging === 'Charging') ckind = 'status-online';  
+                else if (charging === 'Discharging') ckind = 'status-battery';  
+                updateStatusBadge('battery-charging', charging, ckind);  
+  
+                // Battery  
+                document.getElementById('battery-charge').textContent =  
+                    (data.battery_charge != null ? data.battery_charge : '--') + ' %';  
+                updateBar('battery-charge-bar', data.battery_charge);  
+                document.getElementById('battery-voltage').textContent =  
+                    (data.battery_voltage != null ? data.battery_voltage : '--') + ' V';  
+                document.getElementById('battery-runtime').textContent =  
+                    (data.battery_runtime != null ? Math.round(data.battery_runtime / 60) : '--') + ' min';  
+                document.getElementById('battery-current').textContent =  
+                    (data.battery_current != null ? data.battery_current.toFixed(2) : '0.00') + ' A';  
+                updateBar('battery-current-bar', ((data.battery_current || 0) / 10) * 100);  
+  
+                // Input  
+                document.getElementById('input-voltage').textContent =  
+                    (data.input_voltage != null ? data.input_voltage : '--') + ' V';  
+                document.getElementById('input-frequency').textContent =  
+                    (data.input_frequency != null ? data.input_frequency.toFixed(1) : '--') + ' Hz';  
+                document.getElementById('input-current').textContent =  
+                    (data.input_current != null ? data.input_current.toFixed(2) : '0.00') + ' A';  
+                updateBar('input-current-bar', ((data.input_current || 0) / 15) * 100);  
+  
+                // Output / Load  
+                document.getElementById('load-voltage').textContent =  
+                    (data.load_voltage != null ? data.load_voltage : '--') + ' V';  
+                document.getElementById('ups-load').textContent =  
+                    (data.ups_load != null ? data.ups_load : '--') + ' %';  
+                updateBar('ups-load-bar', data.ups_load);  
+                document.getElementById('load-current').textContent =  
+                    (data.load_current != null ? data.load_current.toFixed(2) : '0.00') + ' A';  
+                updateBar('load-current-bar', ((data.load_current || 0) / 15) * 100);  
+  
+                updateFaults(data.faults);  
+            } catch (error) {  
+                console.error('Error fetching status:', error);  
+            }  
+        }  
+  
+        function updateFaults(faults) {  
+            const panel = document.getElementById('faults-panel');  
+            const list = document.getElementById('faults-list');  
+            list.innerHTML = '';  
+            const items = (faults || '').split(',').map(f => f.trim()).filter(f => f);  
+            if (items.length === 0) {  
+                panel.classList.add('no-faults');  
+                return;  
+            }  
+            panel.classList.remove('no-faults');  
+            items.forEach(f => {  
+                const div = document.createElement('div');  
+                div.className = 'fault-item';  
+                div.textContent = f;  
+                list.appendChild(div);  
+            });  
+        }  
+  
+        async function requestShutdown() {  
+            if (!confirm('Shut down the Raspberry Pi now? This cannot be undone remotely.')) {  
+                return;  
+            }  
+            try {  
+                const response = await fetch('/api/shutdown', { method: 'POST' });  
+                const data = await response.json();  
+                if (data.success) {  
+                    alert('Shutdown initiated.');  
+                } else {  
+                    alert('Shutdown failed: ' + (data.message || 'unknown error'));  
+                }  
+            } catch (error) {  
+                alert('Shutdown request failed: ' + error);  
+            }  
+        }  
+  
+        async function fetchEvents() {  
+            try {  
+                const response = await fetch('/api/events');  
+                const events = await response.json();  
+                const eventsList = document.getElementById('events-list');  
+                eventsList.innerHTML = '';  
+                events.forEach(event => {  
+                    const eventDiv = document.createElement('div');  
+                    eventDiv.className = `event ${event.severity.toLowerCase()}`;  
+                    eventDiv.innerHTML = `  
+                        <div class="event-time">${formatTime(new Date(event.timestamp))}</div>  
+                        <div class="event-message">${event.event_type}: ${event.message}</div>  
+                    `;  
+                    eventsList.appendChild(eventDiv);  
+                });  
+            } catch (error) {  
+                console.error('Error fetching events:', error);  
+            }  
+        }  
+  
+        function refreshData() {  
+            fetchStatus();  
+            fetchEvents();  
+        }  
+  
+        // Initial load  
+        refreshData();  
+  
+        // Auto-refresh every 10 seconds  
+        setInterval(refreshData, 10000);  
+    </script>  
+</body>  
+</html>
