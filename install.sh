@@ -1,22 +1,22 @@
 #!/bin/bash  
 # DizerUPS Automated Installation Script for Raspberry Pi  
-# Version: 1.2  
+# Version: 1.3  
   
 set -e  
   
-DIZERUPS_VERSION="1.2"  
+DIZERUPS_VERSION="1.3"  
   
 echo "=========================================="  
 echo "DizerUPS Automated Installation (v$DIZERUPS_VERSION)"  
 echo "=========================================="  
   
-# Must run as root  
+# Check if running as root  
 if [ "$EUID" -ne 0 ]; then  
     echo "Please run as root (use sudo)"  
     exit 1  
 fi  
   
-# Resolve the real (non-root) user  
+# Get the actual user (not root)  
 ACTUAL_USER=${SUDO_USER:-pi}  
 ACTUAL_HOME=$(eval echo ~"$ACTUAL_USER")  
 ACTUAL_GROUP=$(id -gn "$ACTUAL_USER")  
@@ -26,15 +26,15 @@ APP_DIR="$ACTUAL_HOME/ups-monitor"
 LOG_DIR="/var/log/ups-monitor"  
   
 # ------------------------------------------------------------------  
-# Step 1: Install system packages  
+# Step 1: System packages  
 # ------------------------------------------------------------------  
 echo ""  
 echo "Step 1: Installing system packages..."  
 apt-get update  
-apt-get install -y nut nut-client nut-server python3 python3-venv python3-pip usbutils  
+apt-get install -y nut nut-client nut-server python3 python3-venv python3-pip  
   
 # ------------------------------------------------------------------  
-# Step 2: Prompt for credentials (NUT + web)  
+# Step 2: Credentials (NUT + web dashboard)  
 # ------------------------------------------------------------------  
 echo ""  
 echo "Step 2: Setting credentials..."  
@@ -57,33 +57,52 @@ if [ ${#WEB_PASSWORD} -lt 6 ]; then
 fi  
   
 # ------------------------------------------------------------------  
-# Step 3: Release any running NUT driver, then scan (informational)  
+# Step 3: Detect UPS (informational scan)  
 # ------------------------------------------------------------------  
 echo ""  
 echo "Step 3: Detecting UPS..."  
-systemctl stop nut-driver-enumerator 2>/dev/null || true  
-systemctl stop nut-server 2>/dev/null || true  
+  
+# Release any driver holding the USB device so the scan can read it  
 upsdrvctl stop 2>/dev/null || true  
-sleep 1  
+systemctl stop nut-driver-enumerator 2>/dev/null || true  
   
-echo "Scanning for UPS devices (informational):"  
-nut-scanner -U 2>/dev/null || echo "  (nut-scanner produced no output; using defaults)"  
-  
-# Fixed config for the CyberPower VP1200ELCD (usbhid-ups / auto)  
-UPS_DRIVER="usbhid-ups"  
-UPS_PORT="auto"  
-UPS_DESC="CyberPower VP1200ELCD"  
+SCAN_OUTPUT="$(nut-scanner -U 2>/dev/null || true)"  
+echo "$SCAN_OUTPUT"  
   
 # ------------------------------------------------------------------  
-# Step 4: Write NUT config (printf — no here-docs, whitespace-safe)  
+# Step 4: Parse scan results (THE FIX)  
+# Extract the text between the double quotes for each field.  
+# The trailing space in each pattern avoids matching productid/  
+# vendorid/busport. Never execute the values as commands.  
+# ------------------------------------------------------------------  
+UPS_DRIVER="$(printf  '%s\n' "$SCAN_OUTPUT" | awk -F'"' '/driver /  {print $2; exit}')"  
+UPS_PORT="$(printf    '%s\n' "$SCAN_OUTPUT" | awk -F'"' '/[[:space:]]port /  {print $2; exit}')"  
+UPS_VENDOR="$(printf  '%s\n' "$SCAN_OUTPUT" | awk -F'"' '/vendor /  {print $2; exit}')"  
+UPS_PRODUCT="$(printf '%s\n' "$SCAN_OUTPUT" | awk -F'"' '/product / {print $2; exit}')"  
+  
+# Fallbacks for the CyberPower VP1200ELCD if the scan returns nothing  
+UPS_DRIVER="${UPS_DRIVER:-usbhid-ups}"  
+UPS_PORT="${UPS_PORT:-auto}"  
+UPS_VENDOR="${UPS_VENDOR:-CPS}"  
+UPS_PRODUCT="${UPS_PRODUCT:-VP1200ELCD}"  
+  
+echo ""  
+echo "Using UPS configuration:"  
+echo "  Driver:  $UPS_DRIVER"  
+echo "  Port:    $UPS_PORT"  
+echo "  Vendor:  $UPS_VENDOR"  
+echo "  Product: $UPS_PRODUCT"  
+  
+# ------------------------------------------------------------------  
+# Step 5: Write NUT config (printf-based, no here-docs)  
 # ------------------------------------------------------------------  
 echo ""  
-echo "Step 4: Configuring NUT..."  
+echo "Step 5: Configuring NUT..."  
   
 printf 'MODE=netserver\n' > /etc/nut/nut.conf  
   
-printf '[myups]\n    driver = %s\n    port = %s\n    desc = "%s"\n' \  
-    "$UPS_DRIVER" "$UPS_PORT" "$UPS_DESC" > /etc/nut/ups.conf  
+printf '[myups]\n    driver = %s\n    port = %s\n    desc = "%s %s"\n' \  
+    "$UPS_DRIVER" "$UPS_PORT" "$UPS_VENDOR" "$UPS_PRODUCT" > /etc/nut/ups.conf  
   
 printf 'LISTEN 0.0.0.0 3493\nMAXAGE 30\n' > /etc/nut/upsd.conf  
   
@@ -97,27 +116,20 @@ chown root:nut /etc/nut/*.conf /etc/nut/upsd.users
 chmod 640 /etc/nut/*.conf /etc/nut/upsd.users  
   
 # ------------------------------------------------------------------  
-# Step 5: Start NUT services  
+# Step 6: Start NUT services  
 # ------------------------------------------------------------------  
 echo ""  
-echo "Step 5: Starting NUT services..."  
-systemctl enable nut-server nut-monitor 2>/dev/null || true  
+echo "Step 6: Starting NUT services..."  
+systemctl restart nut-server nut-monitor 2>/dev/null || true  
 upsdrvctl start 2>/dev/null || true  
-systemctl restart nut-server  
-systemctl restart nut-monitor 2>/dev/null || true  
 sleep 3  
   
-# ------------------------------------------------------------------  
-# Step 6: Confirm the driver is delivering live data  
-# ------------------------------------------------------------------  
 echo ""  
-echo "Step 6: Confirming UPS driver..."  
-if upsc myups@localhost ups.status >/dev/null 2>&1; then  
-    echo "  Driver confirmed. Live status: $(upsc myups@localhost ups.status 2>/dev/null)"  
+echo "Verifying NUT can read the UPS..."  
+if upsc myups@localhost 2>/dev/null | grep -q 'battery.charge'; then  
+    echo "  OK - UPS is reporting data."  
 else  
-    echo "  ERROR: could not read myups@localhost."  
-    echo "  Check 'lsusb' for the UPS and 'upsdrvctl -D start' for driver errors."  
-    exit 1  
+    echo "  WARNING: upsc did not return data yet. Check 'upsc myups@localhost' after install."  
 fi  
   
 # ------------------------------------------------------------------  
@@ -126,52 +138,50 @@ fi
 echo ""  
 echo "Step 7: Installing application..."  
 mkdir -p "$APP_DIR/templates"  
-cp "$SCRIPT_DIR/ups_monitor.py" "$APP_DIR/"  
-cp "$SCRIPT_DIR/config.yaml"    "$APP_DIR/"  
-cp "$SCRIPT_DIR/requirements.txt" "$APP_DIR/"  
+cp "$SCRIPT_DIR/ups_monitor.py"        "$APP_DIR/"  
+cp "$SCRIPT_DIR/config.yaml"          "$APP_DIR/"  
+cp "$SCRIPT_DIR/requirements.txt"     "$APP_DIR/"  
 cp "$SCRIPT_DIR/templates/dashboard.html" "$APP_DIR/templates/"  
   
 # ------------------------------------------------------------------  
-# Step 8: Write config.yaml credentials DIRECTLY (no placeholder sed)  
+# Step 8: Inject credentials into config.yaml  
+# Use | as the sed delimiter so passwords with / or $ don't break it.  
 # ------------------------------------------------------------------  
 echo ""  
 echo "Step 8: Writing credentials into config.yaml..."  
-python3 - "$APP_DIR/config.yaml" "$NUT_PASSWORD" "$WEB_USERNAME" "$WEB_PASSWORD" <<'PYEOF'  
-import sys, yaml  
-path, nut_pw, web_user, web_pw = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]  
-with open(path) as f:  
-    cfg = yaml.safe_load(f)  
-cfg.setdefault('ups', {}).setdefault('nut', {})['password'] = nut_pw  
-cfg.setdefault('web', {})['username'] = web_user  
-cfg.setdefault('web', {})['password'] = web_pw  
-with open(path, 'w') as f:  
-    yaml.safe_dump(cfg, f, default_flow_style=False, sort_keys=False)  
-print("  Credentials written (web user: %s)" % web_user)  
-PYEOF  
+sed -i "s|password: your_nut_password|password: $NUT_PASSWORD|g" "$APP_DIR/config.yaml"  
+sed -i "s|username: your_web_username|username: $WEB_USERNAME|g"  "$APP_DIR/config.yaml"  
+sed -i "s|username: admin|username: $WEB_USERNAME|g"             "$APP_DIR/config.yaml"  
+sed -i "s|password: your_web_password|password: $WEB_PASSWORD|g"  "$APP_DIR/config.yaml"  
   
 # ------------------------------------------------------------------  
 # Step 9: Python virtual environment  
 # ------------------------------------------------------------------  
 echo ""  
-echo "Step 9: Setting up Python environment..."  
+echo "Step 9: Creating Python virtual environment..."  
 python3 -m venv "$APP_DIR/venv"  
 "$APP_DIR/venv/bin/pip" install --upgrade pip  
 "$APP_DIR/venv/bin/pip" install -r "$APP_DIR/requirements.txt"  
   
 # ------------------------------------------------------------------  
-# Step 10: Log directory + ownership  
+# Step 10: Log directory  
 # ------------------------------------------------------------------  
 echo ""  
 echo "Step 10: Creating log directory..."  
 mkdir -p "$LOG_DIR"  
-chown -R "$ACTUAL_USER":"$ACTUAL_GROUP" "$LOG_DIR" "$APP_DIR"  
+chown -R "$ACTUAL_USER:$ACTUAL_GROUP" "$LOG_DIR"  
   
 # ------------------------------------------------------------------  
-# Step 11: systemd service (printf — no here-doc)  
+# Step 11: Ownership of app dir  
+# ------------------------------------------------------------------  
+chown -R "$ACTUAL_USER:$ACTUAL_GROUP" "$APP_DIR"  
+  
+# ------------------------------------------------------------------  
+# Step 12: systemd service (printf-based)  
 # ------------------------------------------------------------------  
 echo ""  
-echo "Step 11: Installing systemd service..."  
-printf '[Unit]\nDescription=DizerUPS Monitor\nAfter=network.target nut-server.service\n\n[Service]\nType=simple\nUser=%s\nGroup=%s\nWorkingDirectory=%s\nExecStart=%s/venv/bin/python3 %s/ups_monitor.py\nRestart=always\nRestartSec=5\n\n[Install]\nWantedBy=multi-user.target\n' \  
+echo "Step 12: Creating systemd service..."  
+printf '[Unit]\nDescription=DizerUPS UPS Monitor\nAfter=network.target nut-server.service\n\n[Service]\nType=simple\nUser=%s\nGroup=%s\nWorkingDirectory=%s\nExecStart=%s/venv/bin/python3 %s/ups_monitor.py\nRestart=always\nRestartSec=5\n\n[Install]\nWantedBy=multi-user.target\n' \  
     "$ACTUAL_USER" "$ACTUAL_GROUP" "$APP_DIR" "$APP_DIR" "$APP_DIR" \  
     > /etc/systemd/system/ups-monitor.service  
   
@@ -180,37 +190,30 @@ systemctl enable ups-monitor
 systemctl restart ups-monitor  
   
 # ------------------------------------------------------------------  
-# Step 12: Firewall (optional, allow dashboard port on LAN)  
-# ------------------------------------------------------------------  
-if command -v ufw >/dev/null 2>&1; then  
-    ufw allow 5000/tcp 2>/dev/null || true  
-fi  
-  
-# ------------------------------------------------------------------  
 # Done  
 # ------------------------------------------------------------------  
-sleep 2  
+LAN_IP="$(hostname -I | awk '{print $1}')"  
 echo ""  
 echo "=========================================="  
-echo "Installation Complete! (v$DIZERUPS_VERSION)"  
+echo "Installation Complete!"  
 echo "=========================================="  
 echo ""  
-echo "Web Dashboard: http://$(hostname -I | awk '{print $1}'):5000"  
+echo "Web dashboard: http://$LAN_IP:5000"  
 echo "  Username: $WEB_USERNAME"  
-echo "  Password: (the web password you entered)"  
+echo "  Password: (the one you entered)"  
 echo ""  
 echo "NUT Credentials:"  
 echo "  Username: upsmon"  
-echo "  Password: (the NUT password you entered)"  
+echo "  Password: $NUT_PASSWORD"  
 echo ""  
-echo "Config file: $APP_DIR/config.yaml"  
-echo "Log file:    $LOG_DIR/ups-monitor.log"  
+echo "Configuration file: $APP_DIR/config.yaml"  
+echo "Log file: $LOG_DIR/ups-monitor.log"  
 echo ""  
-echo "Service management:"  
+echo "To manage the service:"  
 echo "  sudo systemctl status ups-monitor"  
 echo "  sudo systemctl restart ups-monitor"  
+echo "  sudo systemctl stop ups-monitor"  
 echo ""  
-echo "Test NUT manually:  upsc myups@localhost"  
-echo ""  
-echo "Service status:"  
-systemctl status ups-monitor --no-pager || true
+echo "To test NUT manually:"  
+echo "  upsc myups@localhost"  
+echo ""
