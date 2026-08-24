@@ -3,7 +3,7 @@
 <head>  
     <meta charset="UTF-8">  
     <meta name="viewport" content="width=device-width, initial-scale=1.0">  
-    <title>DizerUPS - Raspberry Pi UPS Monitor</title> 
+    <title>DizerUPS - Raspberry Pi UPS Monitor</title>  
     <title>https://github.com/vekzla/DizerUPS</title>  
     <style>  
         * {  
@@ -62,13 +62,6 @@
             background: #ffffff;  
             color: #4a4a4a;  
         }  
-  
-        .btn-shutdown {  
-            background: #e74c3c;  
-            color: #ffffff;  
-        }  
-  
-        .btn-shutdown:hover { opacity: 0.9; }  
   
         .grid {  
             display: grid;  
@@ -182,19 +175,22 @@
   
         .legend-grid {  
             display: grid;  
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));  
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));  
             gap: 12px;  
         }  
   
         .legend-item {  
             display: flex;  
-            gap: 8px;  
+            gap: 10px;  
+            align-items: baseline;  
         }  
   
         .legend-code {  
             font-weight: 700;  
             color: #4a4a4a;  
-            min-width: 45px;  
+            min-width: 70px;  
+            flex-shrink: 0;  
+            white-space: nowrap;  
         }  
   
         .legend-desc {  
@@ -226,7 +222,6 @@
   
         <div class="controls">  
             <button class="btn btn-refresh" onclick="refreshData()">Refresh</button>  
-            <button class="btn btn-shutdown" onclick="requestShutdown()">Shutdown</button>  
         </div>  
   
         <div class="grid">  
@@ -466,23 +461,6 @@
                 div.textContent = f;  
                 list.appendChild(div);  
             });  
-        }  
-  
-        async function requestShutdown() {  
-            if (!confirm('Shut down the Raspberry Pi now? This cannot be undone remotely.')) {  
-                return;  
-            }  
-            try {  
-                const response = await fetch('/api/shutdown', { method: 'POST' });  
-                const data = await response.json();  
-                if (data.success) {  
-                    alert('Shutdown initiated.');  
-                } else {  
-                    alert('Shutdown failed: ' + (data.message || 'unknown error'));  
-                }  
-            } catch (error) {  
-                alert('Shutdown request failed: ' + error);  
-            }  
         }  
   
         async function fetchEvents() {  
