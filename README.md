@@ -55,35 +55,52 @@ The installer will:
 Edit `~/ups-monitor/config.yaml` to change settings after install:  
   
 ```yaml  
+# DizerUPS Configuration File  
+  
+# UPS Configuration  
 ups:  
   type: nut  
   nut:  
     host: localhost  
-    port: 3493  
-    ups_name: myups  
+    port: 
+    username: 
+    password: 
+    ups_name: 
   
+# Web Interface Configuration  
 web:  
-  host: 0.0.0.0  
-  port: 5000  
-  username: admin  
-  password: your_web_password_here  
+  host: 
+  port: 
+  username: 
+  password:
   
+# Logging Configuration  
 logging:  
   file: /var/log/ups-monitor/ups-monitor.log  
-  level: INFO  
-  max_size_mb: 10  
-  backup_count: 5  
+  level:
+  max_size_mb: 
+  backup_count:
   
+# Alert Configuration  
 alerts:  
-  low_battery_threshold: 20  
-  high_load_threshold: 80  
+  low_battery_threshold: 
+  high_load_threshold:
+  email_alerts: 
+  email_to: 
+  email_from: 
+  smtp_server: 
+  smtp_port: 
+  smtp_username:
+  smtp_password: 
   
+# Shutdown Configuration  
 shutdown:  
-  enabled: false  
-  low_battery_threshold: 10  
-  delay_seconds: 60  
+  enabled:
+  low_battery_threshold:
+  delay_seconds:
   
-logging_interval: 60  
+# Logging Interval (seconds)  
+logging_interval:
 ```  
   
 ## Calculated Metrics  
