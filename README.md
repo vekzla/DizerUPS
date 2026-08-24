@@ -1,8 +1,6 @@
-# DizerUPS - Raspberry Pi UPS Monitor  
+# DizerUPS - Raspberry Pi UPS Monitor
   
 A comprehensive UPS monitoring solution for Raspberry Pi with real-time web dashboard, calculated power metrics, automated alerts, and system shutdown capabilities.  
-  
-Version: 1.2  
   
 ## Features  
   
